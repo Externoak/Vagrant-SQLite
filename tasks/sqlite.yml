@@ -1,0 +1,48 @@
+- name: Config Languague
+  command: locale-gen es_ES.UTF-8
+
+- name: Install SQLite
+  apt: name={{ item }} update_cache=yes state=present
+  with_items:
+  - build-essential
+  - sqlite3
+  - libsqlite3-dev
+  - git
+  - cmake
+  - libreadline-dev
+
+- script: nanomsg.sh
+
+- git:
+    repo: https://github.com/litereplica/litereplica.git
+    dest: /home/vagrant/litereplica
+    clone: yes
+
+- git:
+    repo: https://github.com/liteserver/binn
+    dest: /home/vagrant/binn
+    clone: yes
+
+- make:
+    chdir: /home/vagrant/binn/
+
+- name: Running make install
+  command: 'make install chdir=/home/vagrant/binn/'
+
+- make:
+    chdir: /home/vagrant/litereplica/sqlite3.8/
+
+- name: Running make install
+  command: 'make install chdir=/home/vagrant/litereplica/sqlite3.8/'
+
+- name: Create Database
+  command: sqlite3 "file:{{Database}}?replica=master&slave=tcp://192.168.80.4:1234"
+  when: inventory_hostname == "SQLite1"
+
+- name: Slave Database {{Database}}
+  command: sqlite3 "file:{{Database}}?replica=slave&bind=tcp://0.0.0.0:1234"
+  when: inventory_hostname == "SQLite2"
+
+- name: Create Table {{Table}}
+  command: sqlite3 {{Database}} "create table {{Table}}(one varchar(10));"
+  when: inventory_hostname == "SQLite1"
